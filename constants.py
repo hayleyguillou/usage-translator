@@ -5,3 +5,9 @@ DEFAULT_CSV_FILE = "data/Sample_Report.csv"
 DEFAULT_JSON_FILE = "data/typemap.json"
 DEFAULT_LOG_FILE = "usage_translator.log"
 PARTNER_IDS_TO_SKIP = [26392]
+UNIT_REDUCTION = {
+    "EA000001GB0O": 1000,
+    "PMQ00005GB0R": 5000,
+    "SSX006NR": 1000,
+    "SPQ00001MB0R": 2000,
+}
