@@ -6,7 +6,7 @@ from pathlib import Path
 from constants import OUTPUT_FOLDER, CHARGEABLE_SQL_FILE, DOMAINS_SQL_FILE, DEFAULT_CSV_FILE, DEFAULT_JSON_FILE, DEFAULT_LOG_FILE, PARTNER_IDS_TO_SKIP
 from utils import setup_logging
 
-def generate_chargeable_sql(df, partner_id_skip_list=PARTNER_IDS_TO_SKIP):
+def generate_chargeable_sql(df, type_map, partner_id_skip_list=PARTNER_IDS_TO_SKIP):
     sql = []
 
     for index, row in df.iterrows():
@@ -25,15 +25,19 @@ def generate_chargeable_sql(df, partner_id_skip_list=PARTNER_IDS_TO_SKIP):
             logging.warning(f"PartnerID {row['PartnerID']} is in the skip list at index {row_number}: skipping row")
             continue
 
+        if part_number not in type_map:
+            logging.warning(f"PartNumber {part_number} not found in typemap at index {row_number}: skipping row")
+            continue
+
+        translated_part_number = type_map[part_number]
+
 
         sql.append(
-            f"INSERT INTO chargeable (PartnerID, PartNumber, accountGuid, plan, domains, itemCount) "
-            f"VALUES ({row['PartnerID']}, '{part_number}', '{row['accountGuid']}', '{row['plan']}', "
+            f"INSERT INTO chargeable (partnerID, product, productPurchasedPlanID, plan, usage) "
+            f"VALUES ({row['PartnerID']}, '{translated_part_number}', '{row['accountGuid']}', '{row['plan']}', "
             f"'{row['domains']}', {item_count});"
         )
-        logging.debug(f"Generated SQL for index {row_number}: {sql[-1]}")
-        # Example of generating SQL based on DataFrame rows
-        
+        logging.debug(f"Generated SQL for index {row_number}: {sql[-1]}")        
 
     return sql
 
