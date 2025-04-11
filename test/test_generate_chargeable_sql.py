@@ -43,43 +43,43 @@ def run_with_logs(caplog, df, log_level="WARNING"):
 def test_missing_part_number(caplog):
     df = pd.DataFrame([df_row(part_number=None)])
 
-    chargeable_sql = run_with_logs(caplog, df)
+    chargeable_sql, _, _ = run_with_logs(caplog, df)
 
     assert len(chargeable_sql) == 0
-    assert "PartNumber is missing at index 2: skipping row" in caplog.text
+    assert "PartNumber is missing: skipping row 2" in caplog.text
 
 def test_zero_negative_item_count(caplog):
     df = pd.DataFrame([df_row(item_count=0), df_row(item_count=-1)])
 
-    chargeable_sql = run_with_logs(caplog, df)
+    chargeable_sql, _, _ = run_with_logs(caplog, df)
 
     assert len(chargeable_sql) == 0
-    assert "ItemCount is zero or negative at index 2: skipping row" in caplog.text
-    assert "ItemCount is zero or negative at index 3: skipping row" in caplog.text
+    assert "ItemCount is zero or negative: skipping row 2" in caplog.text
+    assert "ItemCount is zero or negative: skipping row 3" in caplog.text
 
 def test_non_numeric_item_count(caplog):
     df = pd.DataFrame([df_row(item_count="not a number")])
 
-    chargeable_sql = run_with_logs(caplog, df)
+    chargeable_sql, _, _ = run_with_logs(caplog, df)
 
     assert len(chargeable_sql) == 0
-    assert "ItemCount is not numeric at index 2: skipping row" in caplog.text
+    assert "ItemCount is not an integer: skipping row 2" in caplog.text
 
 def test_partner_id_in_list(caplog):
     df = pd.DataFrame([df_row(partner_id=partner_id_to_skip)])
 
-    chargeable_sql = run_with_logs(caplog, df, log_level="DEBUG")
+    chargeable_sql, _, _ = run_with_logs(caplog, df, log_level="DEBUG")
 
     assert len(chargeable_sql) == 0
-    assert f"PartnerID {partner_id_to_skip} is in the skip list at index 2: skipping row" in caplog.text
+    assert f"PartnerID {partner_id_to_skip} is in the skip list: skipping row 2" in caplog.text
 
 def test_part_number_not_in_typemap(caplog):
     df = pd.DataFrame([df_row(part_number=invalid_part_number)])
 
-    chargeable_sql = run_with_logs(caplog, df)
+    chargeable_sql, _, _ = run_with_logs(caplog, df)
 
     assert len(chargeable_sql) == 0
-    assert f"PartNumber {invalid_part_number} not found in typemap at index 2: skipping row" in caplog.text
+    assert f"PartNumber {invalid_part_number} not found in typemap: skipping row 2" in caplog.text
 
 def test_invalid_partner_purchased_plan_id(caplog):
     df = pd.DataFrame([
@@ -87,11 +87,11 @@ def test_invalid_partner_purchased_plan_id(caplog):
         df_row(account_guid="")
     ])
 
-    chargeable_sql = run_with_logs(caplog, df)
+    chargeable_sql, _, _ = run_with_logs(caplog, df)
 
     assert len(chargeable_sql) == 0
-    assert "Invalid partnerPurchasedPlanID ('abc123456789veryveryveryveryverylongstring') at index 2: skipping row" in caplog.text
-    assert "Invalid partnerPurchasedPlanID ('') at index 3: skipping row" in caplog.text
+    assert "Invalid partnerPurchasedPlanID ('abc123456789veryveryveryveryverylongstring'): skipping row 2" in caplog.text
+    assert "Invalid partnerPurchasedPlanID (''): skipping row 3" in caplog.text
 
 def test_unit_reduction(caplog):
     item_count = 5000
@@ -102,17 +102,54 @@ def test_unit_reduction(caplog):
         df_row(item_count=item_count)
     ])
 
-    chargeable_sql = run_with_logs(caplog, df)
+    chargeable_sql, _, _ = run_with_logs(caplog, df)
 
     assert len(chargeable_sql) == 2
     assert chargeable_sql[0] == (
         "INSERT INTO chargeable (partnerID, product, productPurchasedPlanID, plan, usage) "
-        f"VALUES ({valid_partner_id}, '{type_map[unit_reduction_part_number]}', '{cleaned_account_guid}', 'TestPlan', 'test.example.com', {reduced_item_count});"
+        f"VALUES ({valid_partner_id}, '{type_map[unit_reduction_part_number]}', '{cleaned_account_guid}', 'TestPlan', {reduced_item_count});"
     )
     assert chargeable_sql[1] == (
         "INSERT INTO chargeable (partnerID, product, productPurchasedPlanID, plan, usage) "
-        f"VALUES ({valid_partner_id}, '{type_map[valid_part_number]}', '{cleaned_account_guid}', 'TestPlan', 'test.example.com', {item_count});"
+        f"VALUES ({valid_partner_id}, '{type_map[valid_part_number]}', '{cleaned_account_guid}', 'TestPlan', {item_count});"
     )
+
+def test_product_totals():
+    df = pd.DataFrame([
+        df_row(part_number=valid_part_number, item_count=5),
+        df_row(part_number=unit_reduction_part_number, item_count=5000),
+        df_row(part_number=valid_part_number, item_count=10)
+    ])
+
+    chargeable_sql, product_totals, _ = generate_chargeable_sql(df, type_map)
+
+    assert len(chargeable_sql) == 3
+    assert len(product_totals) == 2
+    assert product_totals[valid_part_number] == 15
+    assert product_totals[unit_reduction_part_number] == 5
+
+def test_domain_partners():
+    df = pd.DataFrame([
+        df_row(domains="test.example.com", account_guid="abc-123"),
+        df_row(domains="another.example.com", account_guid="xyz-789")
+    ])
+
+    _, _, domain_partners = generate_chargeable_sql(df, type_map)
+
+    assert len(domain_partners) == 2
+    assert domain_partners["test.example.com"] == cleaned_account_guid
+    assert domain_partners["another.example.com"] == "xyz789"
+
+def test_duplicate_domains_product_pairs():
+    df = pd.DataFrame([
+        df_row(domains="test.example.com", account_guid="abc-123"),
+        df_row(domains="test.example.com", account_guid="xyz-789")
+    ])
+
+    _, _, domain_partners = generate_chargeable_sql(df, type_map)
+
+    assert len(domain_partners) == 1
+    assert domain_partners["test.example.com"] == "xyz789" # Last one wins
 
 def test_valid_data(caplog):
     df = pd.DataFrame([
@@ -122,11 +159,11 @@ def test_valid_data(caplog):
         df_row()
     ])
 
-    chargeable_sql = run_with_logs(caplog, df, log_level="DEBUG")
+    chargeable_sql, _, _ = run_with_logs(caplog, df, log_level="DEBUG")
 
     assert len(chargeable_sql) == 1
     assert chargeable_sql[0] == (
         "INSERT INTO chargeable (partnerID, product, productPurchasedPlanID, plan, usage) "
-        f"VALUES ({valid_partner_id}, '{type_map[valid_part_number]}', '{cleaned_account_guid}', 'TestPlan', 'test.example.com', 5);"
+        f"VALUES ({valid_partner_id}, '{type_map[valid_part_number]}', '{cleaned_account_guid}', 'TestPlan', 5);"
     )
     assert "Generated SQL for index 5" in caplog.text

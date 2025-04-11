@@ -9,36 +9,35 @@ from collections import defaultdict
 
 def generate_chargeable_sql(df, type_map, partner_id_skip_list=PARTNER_IDS_TO_SKIP):
     sql = []
-    item_count_map = defaultdict(int)
+    product_totals = defaultdict(int)
+    domain_partners = defaultdict(str)
 
     for index, row in df.iterrows():
+        row_number = index + 2  # Adjust for header row and 0-based index
+        
         part_number = row["PartNumber"]
         item_count = row["itemCount"]
         partner_id = row["PartnerID"]
         account_guid = row["accountGuid"]
+        domain = row["domains"]
         plan = row["plan"]
-        domains = row["domains"]
         partner_purchased_plan_id = clean_guid(account_guid)
 
-        row_number = index + 2  # Adjust for header row and 0-based index
-        
-        if pd.isna(part_number):
-            logging.warning(f"PartNumber is missing at index {row_number}: skipping row")
-            continue
-        elif not isinstance(item_count, (int)):
-            logging.warning(f"ItemCount is not numeric at index {row_number}: skipping row")
-            continue
-        elif item_count <= 0:
-            logging.warning(f"ItemCount is zero or negative at index {row_number}: skipping row")
-            continue
-        elif partner_id_skip_list and partner_id in partner_id_skip_list:
-            logging.warning(f"PartnerID {partner_id} is in the skip list at index {row_number}: skipping row")
-            continue
-        elif part_number not in type_map:
-            logging.warning(f"PartNumber {part_number} not found in typemap at index {row_number}: skipping row")
-            continue
-        elif len(partner_purchased_plan_id) == 0 or len(partner_purchased_plan_id) > 32:
-            logging.warning(f"Invalid partnerPurchasedPlanID ('{partner_purchased_plan_id}') at index {row_number}: skipping row")
+        try:
+            if pd.isna(part_number):
+                raise ValueError("PartNumber is missing")
+            elif not isinstance(item_count, int):
+                raise ValueError("ItemCount is not an integer")
+            elif item_count <= 0:
+                raise ValueError("ItemCount is zero or negative")
+            elif partner_id_skip_list and partner_id in partner_id_skip_list:
+                raise ValueError(f"PartnerID {partner_id} is in the skip list")
+            elif part_number not in type_map:
+                raise ValueError(f"PartNumber {part_number} not found in typemap")
+            elif len(partner_purchased_plan_id) == 0 or len(partner_purchased_plan_id) > 32:
+                raise ValueError(f"Invalid partnerPurchasedPlanID ('{partner_purchased_plan_id}')")
+        except ValueError as e:
+            logging.warning(f"{e}: skipping row {row_number}")
             continue
 
         translated_part_number = type_map[part_number]
@@ -46,19 +45,32 @@ def generate_chargeable_sql(df, type_map, partner_id_skip_list=PARTNER_IDS_TO_SK
         if part_number in UNIT_REDUCTION:
             item_count = item_count // UNIT_REDUCTION[part_number]
         
-        item_count_map[part_number] += item_count
+        product_totals[part_number] += item_count
+        domain_partners[domain] = partner_purchased_plan_id
         
         sql.append(
             f"INSERT INTO chargeable (partnerID, product, productPurchasedPlanID, plan, usage) "
-            f"VALUES ({partner_id}, '{translated_part_number}', '{partner_purchased_plan_id}', '{row['plan']}', "
-            f"'{row['domains']}', {item_count});"
+            f"VALUES ({partner_id}, '{translated_part_number}', '{partner_purchased_plan_id}', '{plan}', {item_count});"
         )
         logging.debug(f"Generated SQL for index {row_number}: {sql[-1]}")        
 
-    return sql, item_count_map
+    return sql, product_totals, domain_partners
 
-def generate_domains_sql():
-    sql = [f"Domain insert statement {i}" for i in range(10)]
+def generate_domains_sql(domain_map):
+    """
+    Generate SQL for domain inserts.
+
+    Assumptions:
+    - Each unique domain only has a single corresponding partnerPurchasedPlanID
+    - The table is empty before running this script, so no need to check for duplicates
+    """
+    sql = []
+    for domain, partner_purchased_plan_id in domain_map.items():
+        sql.append(
+            f"INSERT INTO domains (domain, partnerPurchasedPlanID) "
+            f"VALUES ('{domain}', '{partner_purchased_plan_id}');"
+        )
+        logging.debug(f"Generated SQL for domain {domain}: {sql[-1]}")
     return sql
 
 def main():
@@ -85,12 +97,11 @@ def main():
         logging.error(f"JSON file not found: {args.json}")
         return
 
-    chargeable_sql, item_count_per_part_number = generate_chargeable_sql(df, type_map)
+    chargeable_sql, item_count_per_part_number, domain_map = generate_chargeable_sql(df, type_map)
 
-    logging.info(f"Generated {len(chargeable_sql)} SQL statements for chargeable items")
     logging.info(f"Item count per part number: {dict(item_count_per_part_number)}")
 
-    domain_sql = generate_domains_sql()
+    domain_sql = generate_domains_sql(domain_map)
 
     Path(OUTPUT_FOLDER).mkdir(parents=True, exist_ok=True)
 
