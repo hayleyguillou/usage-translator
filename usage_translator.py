@@ -3,11 +3,38 @@ import json
 import argparse
 import logging
 from pathlib import Path
-from constants import OUTPUT_FOLDER, CHARGEABLE_SQL_FILE, DOMAINS_SQL_FILE, DEFAULT_CSV_FILE, DEFAULT_JSON_FILE, DEFAULT_LOG_FILE
+from constants import OUTPUT_FOLDER, CHARGEABLE_SQL_FILE, DOMAINS_SQL_FILE, DEFAULT_CSV_FILE, DEFAULT_JSON_FILE, DEFAULT_LOG_FILE, PARTNER_IDS_TO_SKIP
 from utils import setup_logging
 
-def generate_chargeable_sql():
-    sql = [f"Chargeable insert statement {i}" for i in range(10)]
+def generate_chargeable_sql(df, partner_id_skip_list=PARTNER_IDS_TO_SKIP):
+    sql = []
+
+    for index, row in df.iterrows():
+        part_number = row["PartNumber"]
+        item_count = row["itemCount"]
+
+        row_number = index + 2  # Adjust for header row and 0-based index
+        
+        if pd.isna(part_number):
+            logging.warning(f"PartNumber is missing at index {row_number}: skipping row")
+            continue
+        elif item_count <= 0:
+            logging.warning(f"ItemCount is zero or negative at index {row_number}: skipping row")
+            continue
+        elif partner_id_skip_list and row["PartnerID"] in partner_id_skip_list:
+            logging.warning(f"PartnerID {row['PartnerID']} is in the skip list at index {row_number}: skipping row")
+            continue
+
+
+        sql.append(
+            f"INSERT INTO chargeable (PartnerID, PartNumber, accountGuid, plan, domains, itemCount) "
+            f"VALUES ({row['PartnerID']}, '{part_number}', '{row['accountGuid']}', '{row['plan']}', "
+            f"'{row['domains']}', {item_count});"
+        )
+        logging.debug(f"Generated SQL for index {row_number}: {sql[-1]}")
+        # Example of generating SQL based on DataFrame rows
+        
+
     return sql
 
 def generate_domains_sql():
@@ -38,7 +65,7 @@ def main():
         logging.error(f"JSON file not found: {args.json}")
         return
 
-    chargeable_sql= generate_chargeable_sql()
+    chargeable_sql= generate_chargeable_sql(df)
 
     domain_sql = generate_domains_sql()
 
