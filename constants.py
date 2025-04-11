@@ -11,3 +11,5 @@ UNIT_REDUCTION = {
     "SSX006NR": 1000,
     "SPQ00001MB0R": 2000,
 }
+NO_VALID_ROWS_CHARGEABLE_SQL = "-- No valid rows to insert into chargeable table"
+NO_VALID_ROWS_DOMAINS_SQL = "-- No valid rows to insert into domains table"

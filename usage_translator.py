@@ -3,7 +3,7 @@ import json
 import argparse
 import logging
 from pathlib import Path
-from constants import OUTPUT_FOLDER, CHARGEABLE_SQL_FILE, DOMAINS_SQL_FILE, DEFAULT_CSV_FILE, DEFAULT_JSON_FILE, DEFAULT_LOG_FILE, PARTNER_IDS_TO_SKIP, UNIT_REDUCTION
+from constants import NO_VALID_ROWS_CHARGEABLE_SQL, NO_VALID_ROWS_DOMAINS_SQL, OUTPUT_FOLDER, CHARGEABLE_SQL_FILE, DOMAINS_SQL_FILE, DEFAULT_CSV_FILE, DEFAULT_JSON_FILE, DEFAULT_LOG_FILE, PARTNER_IDS_TO_SKIP, UNIT_REDUCTION
 from utils import setup_logging, clean_guid
 from collections import defaultdict
 
@@ -49,12 +49,19 @@ def generate_chargeable_sql(df, type_map, partner_id_skip_list=PARTNER_IDS_TO_SK
         domain_partners[domain] = partner_purchased_plan_id
         
         sql.append(
-            f"INSERT INTO chargeable (partnerID, product, productPurchasedPlanID, plan, usage) "
-            f"VALUES ({partner_id}, '{translated_part_number}', '{partner_purchased_plan_id}', '{plan}', {item_count});"
+            f"({partner_id}, '{translated_part_number}', '{partner_purchased_plan_id}', '{plan}', {item_count})"
         )
-        logging.debug(f"Generated SQL for index {row_number}: {sql[-1]}")        
+        logging.debug(f"Generated SQL for index {row_number}: {sql[-1]}")    
 
-    return sql, product_totals, domain_partners
+    if len(sql):
+        query = "INSERT INTO chargeable (partnerID, product, productPurchasedPlanID, plan, usage) VALUES \n\t"
+        query += ",\n\t".join(sql) + ";"
+        logging.info(f"Generated query inserts {len(sql)} rows into chargeable table")
+    else:
+        query = NO_VALID_ROWS_CHARGEABLE_SQL
+        logging.info("No valid rows to insert into chargeable table")
+
+    return query, product_totals, domain_partners
 
 def generate_domains_sql(domain_map):
     """
@@ -67,11 +74,18 @@ def generate_domains_sql(domain_map):
     sql = []
     for domain, partner_purchased_plan_id in domain_map.items():
         sql.append(
-            f"INSERT INTO domains (domain, partnerPurchasedPlanID) "
-            f"VALUES ('{domain}', '{partner_purchased_plan_id}');"
+            f"('{domain}', '{partner_purchased_plan_id}')"
         )
         logging.debug(f"Generated SQL for domain {domain}: {sql[-1]}")
-    return sql
+
+    if len(sql):
+        query = "INSERT INTO domains (domain, partnerPurchasedPlanID) VALUES \n\t"
+        query += ",\n\t".join(sql) + ";"
+        logging.info(f"Generated query inserts {len(sql)} rows into domains table")
+        return query
+    else:
+        logging.info("No valid rows to insert into domains table")
+        return NO_VALID_ROWS_DOMAINS_SQL
 
 def main():
     parser = argparse.ArgumentParser(description="Usage Translator CLI")
@@ -106,12 +120,12 @@ def main():
     Path(OUTPUT_FOLDER).mkdir(parents=True, exist_ok=True)
 
     with open(f"{OUTPUT_FOLDER}/{CHARGEABLE_SQL_FILE}", "w") as f:
-        f.write("\n".join(chargeable_sql) + "\n")
-    logging.info(f"Wrote chargeable_inserts.sql with {len(chargeable_sql)} statements")
+        f.write(chargeable_sql)
+    logging.info(f"Chargeable insert query written to {OUTPUT_FOLDER}/{CHARGEABLE_SQL_FILE}")
 
     with open(f"{OUTPUT_FOLDER}/{DOMAINS_SQL_FILE}", "w") as f:
-        f.write("\n".join(domain_sql) + "\n")
-    logging.info(f"Wrote domains_inserts.sql with {len(domain_sql)} statements")
+        f.write(domain_sql)
+    logging.info(f"Domains insert query written to {OUTPUT_FOLDER}/{DOMAINS_SQL_FILE}")
 
 if __name__ == "__main__":
     main()
