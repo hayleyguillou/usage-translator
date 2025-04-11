@@ -14,7 +14,10 @@ partner_id_to_skip = list(PARTNER_IDS_TO_SKIP)[0]
 valid_part_number = "ADS000010U0R"
 invalid_part_number = "NOT_IN_TYPEMAP"
 
-def df_row(partner_id=valid_partner_id, part_number=valid_part_number, account_guid="abc-123", plan="TestPlan", domains="test.example.com", item_count=5):
+valid_account_guid = "abc-123"
+cleaned_account_guid = "abc123"
+
+def df_row(partner_id=valid_partner_id, part_number=valid_part_number, account_guid=valid_account_guid, plan="TestPlan", domains="test.example.com", item_count=5):
     """
     Create a DataFrame row with parameters for testing. Defaults to valid values.
     """
@@ -80,6 +83,6 @@ def test_valid_data(caplog):
     assert len(chargeable_sql) == 1
     assert chargeable_sql[0] == (
         "INSERT INTO chargeable (partnerID, product, productPurchasedPlanID, plan, usage) "
-        f"VALUES ({valid_partner_id}, '{type_map[valid_part_number]}', 'abc-123', 'TestPlan', 'test.example.com', 5);"
+        f"VALUES ({valid_partner_id}, '{type_map[valid_part_number]}', '{cleaned_account_guid}', 'TestPlan', 'test.example.com', 5);"
     )
     assert "Generated SQL for index 5" in caplog.text

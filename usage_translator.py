@@ -4,7 +4,7 @@ import argparse
 import logging
 from pathlib import Path
 from constants import OUTPUT_FOLDER, CHARGEABLE_SQL_FILE, DOMAINS_SQL_FILE, DEFAULT_CSV_FILE, DEFAULT_JSON_FILE, DEFAULT_LOG_FILE, PARTNER_IDS_TO_SKIP
-from utils import setup_logging
+from utils import setup_logging, clean_guid
 
 def generate_chargeable_sql(df, type_map, partner_id_skip_list=PARTNER_IDS_TO_SKIP):
     sql = []
@@ -12,6 +12,10 @@ def generate_chargeable_sql(df, type_map, partner_id_skip_list=PARTNER_IDS_TO_SK
     for index, row in df.iterrows():
         part_number = row["PartNumber"]
         item_count = row["itemCount"]
+        partner_id = row["PartnerID"]
+        account_guid = row["accountGuid"]
+        plan = row["plan"]
+        domains = row["domains"]
 
         row_number = index + 2  # Adjust for header row and 0-based index
         
@@ -21,8 +25,8 @@ def generate_chargeable_sql(df, type_map, partner_id_skip_list=PARTNER_IDS_TO_SK
         elif item_count <= 0:
             logging.warning(f"ItemCount is zero or negative at index {row_number}: skipping row")
             continue
-        elif partner_id_skip_list and row["PartnerID"] in partner_id_skip_list:
-            logging.warning(f"PartnerID {row['PartnerID']} is in the skip list at index {row_number}: skipping row")
+        elif partner_id_skip_list and partner_id in partner_id_skip_list:
+            logging.warning(f"PartnerID {partner_id} is in the skip list at index {row_number}: skipping row")
             continue
 
         if part_number not in type_map:
@@ -30,11 +34,11 @@ def generate_chargeable_sql(df, type_map, partner_id_skip_list=PARTNER_IDS_TO_SK
             continue
 
         translated_part_number = type_map[part_number]
-
+        partner_purchased_plan_id = clean_guid(account_guid)
 
         sql.append(
             f"INSERT INTO chargeable (partnerID, product, productPurchasedPlanID, plan, usage) "
-            f"VALUES ({row['PartnerID']}, '{translated_part_number}', '{row['accountGuid']}', '{row['plan']}', "
+            f"VALUES ({partner_id}, '{translated_part_number}', '{partner_purchased_plan_id}', '{row['plan']}', "
             f"'{row['domains']}', {item_count});"
         )
         logging.debug(f"Generated SQL for index {row_number}: {sql[-1]}")        
