@@ -36,6 +36,10 @@ def generate_chargeable_sql(df, type_map, partner_id_skip_list=PARTNER_IDS_TO_SK
         translated_part_number = type_map[part_number]
         partner_purchased_plan_id = clean_guid(account_guid)
 
+        if len(partner_purchased_plan_id) == 0 or len(partner_purchased_plan_id) > 32:
+            logging.warning(f"Invalid partnerPurchasedPlanID ('{partner_purchased_plan_id}') at index {row_number}: skipping row")
+            continue
+
         sql.append(
             f"INSERT INTO chargeable (partnerID, product, productPurchasedPlanID, plan, usage) "
             f"VALUES ({partner_id}, '{translated_part_number}', '{partner_purchased_plan_id}', '{row['plan']}', "

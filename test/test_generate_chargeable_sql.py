@@ -70,6 +70,15 @@ def test_part_number_not_in_typemap(caplog):
     assert len(chargeable_sql) == 0
     assert f"PartNumber {invalid_part_number} not found in typemap at index 2: skipping row" in caplog.text
 
+def test_invalid_partner_purchased_plan_id(caplog):
+    df = pd.DataFrame([df_row(account_guid="abc-123-456-789-veryveryveryveryverylongstring"), df_row(account_guid="")])
+
+    chargeable_sql = run_with_logs(caplog, df)
+
+    assert len(chargeable_sql) == 0
+    assert "Invalid partnerPurchasedPlanID ('abc123456789veryveryveryveryverylongstring') at index 2: skipping row" in caplog.text
+    assert "Invalid partnerPurchasedPlanID ('') at index 3: skipping row" in caplog.text
+
 def test_valid_data(caplog):
     df = pd.DataFrame([
         df_row(part_number=None),
