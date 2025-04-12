@@ -26,3 +26,9 @@ def clean_guid(guid):
     Remove non-alphanumeric characters from a GUID string.
     """
     return ''.join(ch for ch in str(guid) if ch.isalnum()) if guid else ''
+
+def escape_sql_string(s):
+    """
+    Escape single quotes in a string to protect against SQL insertion.
+    """
+    return s.replace("'", "''")

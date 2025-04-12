@@ -37,7 +37,7 @@ def main():
 
     logging.info("Product totals:")
     for part_number, total in product_totals.items():
-        logging.info(f"{part_number}: {total}")
+        logging.info(f"  - Part Number: {part_number}, Total: {total}")
          
     with open(f"{OUTPUT_FOLDER}/{DOMAINS_SQL_FILE}", "w") as domains_sql_output:
         generate_domains_sql(domain_map, domains_sql_output, batch_insert_size=args.batch_insert_size)

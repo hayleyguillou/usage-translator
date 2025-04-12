@@ -119,7 +119,7 @@ def test_product_totals():
         df_row(part_number=unit_reduction_part_number, item_count=5000),
         df_row(part_number=valid_part_number, item_count=10)
     ])
-    _, product_totals, _ = generate_chargeable_sql(df, type_map)
+    _, product_totals, _ = run_generate_chargeable_sql(df)
     assert len(product_totals) == 2
     assert product_totals[valid_part_number] == 15
     assert product_totals[unit_reduction_part_number] == 5
@@ -169,3 +169,14 @@ def test_batch_insert_size():
         "INSERT INTO chargeable (partnerID, product, productPurchasedPlanID, plan, usage) VALUES \n"
         f"\t({valid_partner_id}, '{type_map[valid_part_number]}', '{cleaned_account_guid}', 'TestPlan', 10);\n"
     )
+
+def test_sql_injection_with_single_quote():
+    df = pd.DataFrame([
+        df_row(plan="'); DROP TABLE users; --", item_count=5)
+    ])
+    sql, _, _ = run_generate_chargeable_sql(df)
+    assert len(sql.splitlines()) == 2
+    assert sql == (
+        "INSERT INTO chargeable (partnerID, product, productPurchasedPlanID, plan, usage) VALUES \n"
+        f"\t({valid_partner_id}, '{type_map[valid_part_number]}', '{cleaned_account_guid}', '''); DROP TABLE users; --', 5);\n"
+    ) # SQL injection is not executed, but the input is included in the SQL statement

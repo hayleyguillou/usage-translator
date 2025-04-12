@@ -2,25 +2,30 @@ import pandas as pd
 from collections import defaultdict
 import logging
 from constants import PARTNER_IDS_TO_SKIP, UNIT_REDUCTION, NO_VALID_ROWS_CHARGEABLE_SQL, NO_VALID_ROWS_DOMAINS_SQL
-from utils import clean_guid
+from utils import clean_guid, escape_sql_string
 
-# Constants
+# Constants for SQL generation
 CHARGEABLE_INSERT_HEADER = "INSERT INTO chargeable (partnerID, product, productPurchasedPlanID, plan, usage) VALUES \n"
 DOMAINS_INSERT_HEADER = "INSERT INTO domains (domain, partnerPurchasedPlanID) VALUES \n"
 
 def generate_chargeable_sql(df, type_map, output_file, partner_id_skip_list=PARTNER_IDS_TO_SKIP, batch_insert_size=0):
     """
     Generate SQL for chargeable inserts.
-    """
-    def write_insert_header():
-        output_file.write(CHARGEABLE_INSERT_HEADER)
 
+    Args:
+        df (pd.DataFrame): DataFrame containing usage data.
+        type_map (dict): Mapping of part numbers to product names.
+        output_file: The file to write the SQL insert statements to.
+        partner_id_skip_list (list): List of PartnerIDs to skip.
+        batch_insert_size (int): The number of rows to include in each batch insert statement.
+            default: 0 (no batching).
+    """
+    product_totals = defaultdict(int)
+    domain_partners = defaultdict(str)
+    
     rows_to_insert = 0
     batch_count = 0
     insert_started = False
-    
-    product_totals = defaultdict(int)
-    domain_partners = defaultdict(str)
 
     for index, row in df.iterrows():
         row_number = index + 2  # Adjust for header row and 0-based index
@@ -61,21 +66,23 @@ def generate_chargeable_sql(df, type_map, output_file, partner_id_skip_list=PART
         domain_partners[domain] = partner_purchased_plan_id
 
         if batch_count == 0:
-            write_insert_header()
+            output_file.write(CHARGEABLE_INSERT_HEADER)
             insert_started = True
         elif batch_count > 0:
             output_file.write(",\n")
 
         output_file.write(
-            f"\t({partner_id}, '{translated_part_number}', '{partner_purchased_plan_id}', '{plan}', {item_count})"
+            f"\t({partner_id}, '{translated_part_number}', '{partner_purchased_plan_id}', '{escape_sql_string(plan)}', {item_count})"
         )
         rows_to_insert += 1
         batch_count += 1
+        logging.debug(f"Processed row {row_number}: {partner_id}, {translated_part_number}, {partner_purchased_plan_id}, {plan}, {item_count}")
+        
         if batch_insert_size > 0 and batch_count >= batch_insert_size:
+            logging.debug(f"Batch insert size reached: {batch_insert_size}; {rows_to_insert} rows inserted")
             output_file.write(";\n")
             batch_count = 0
             insert_started = False
-        logging.debug(f"Processed row {row_number}: {part_number}, {item_count}, {partner_id}, {account_guid}")
     
     if rows_to_insert == 0: 
         output_file.truncate(0)
@@ -89,14 +96,27 @@ def generate_chargeable_sql(df, type_map, output_file, partner_id_skip_list=PART
 
 def generate_domains_sql(domain_map, output_file, batch_insert_size=0):
     """
-    Generate SQL for domain inserts.
+    Generate SQL query for domain inserts.
 
+    Args:
+        domain_map (dict): A dictionary mapping domain names to partnerPurchasedPlanID.
+        output_file: The file to write the SQL insert statements to.
+        batch_insert_size (int): The number of rows to include in each batch insert statement.
+            default: 0 (no batching).
+
+    Returns:
+        None
+    
     Assumptions:
     - Each unique domain only has a single corresponding partnerPurchasedPlanID
     - The table is empty before running this script, so no need to check for duplicates
+    - Domain names shouldn't contain ' characters, but if they do, they will be escaped
+    - partnerPurchasedPlanID should be a valid GUID and is already cleaned
     """
-    def write_insert_header():
-        output_file.write(DOMAINS_INSERT_HEADER)
+    if len(domain_map) == 0:
+        output_file.write(NO_VALID_ROWS_DOMAINS_SQL)
+        logging.info("No valid rows to insert into domains table")
+        return
 
     rows_to_insert = 0
     batch_count = 0
@@ -104,23 +124,23 @@ def generate_domains_sql(domain_map, output_file, batch_insert_size=0):
 
     for domain, partner_purchased_plan_id in domain_map.items():
         if batch_count == 0:
-            write_insert_header()
+            output_file.write(DOMAINS_INSERT_HEADER)
             insert_started = True
         elif batch_count > 0:
             output_file.write(",\n")
-        output_file.write(f"\t('{domain}', '{partner_purchased_plan_id}')")
+        
+        output_file.write(f"\t('{escape_sql_string(domain)}', '{partner_purchased_plan_id}')")
         rows_to_insert += 1
         batch_count += 1
         logging.debug(f"Processed domain {domain}: {partner_purchased_plan_id}")
+        
         if batch_insert_size > 0 and batch_count >= batch_insert_size:
+            logging.debug(f"Batch insert size reached: {batch_insert_size}; {rows_to_insert} rows inserted")
             output_file.write(";\n")
             batch_count = 0
             insert_started = False
 
-    if rows_to_insert == 0:
-        output_file.truncate(0)
-        output_file.write(NO_VALID_ROWS_DOMAINS_SQL)
-        logging.info("No valid rows to insert into domains table")
-    elif insert_started:
+    if insert_started:
         output_file.write(";\n")
-        logging.info(f"Query inserts {rows_to_insert} rows into domains table")
+        
+    logging.info(f"Query inserts {rows_to_insert} rows into domains table")
