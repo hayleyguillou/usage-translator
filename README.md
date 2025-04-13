@@ -4,11 +4,13 @@ Take-home coding assessment for NetNation
 ## Setup Instructions
 
 ### Install Dependencies
-Ensure you have Python 3.11 or later installed. Then, create a virtual environment and install the required dependencies:
+Ensure you have Python 3.11 or later installed. Then, create a virtual environment (optional) and install the required dependencies:
 
 ```bash
 pip install -r requirements.txt
 ```
+
+The only external dependency used is `pandas` for handling the CSV data in an in-memory dataframe.
 
 ## Running the Program
 The program can be run from the command line using the following arguments:
