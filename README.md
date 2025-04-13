@@ -18,7 +18,7 @@ The program can be run from the command line using the following arguments:
 - `--csv`: Path to the CSV report file (default: `data/Sample_Report.csv`).
 - `--json`: Path to the typemap JSON file (default: `data/typemap.json`).
 - `--batch-insert-size`: Batch insert size for SQL queries (default: `0` for no batching).
-- `--log`: If set, logs will also be written to the default log file (`usage_translator.log`).
+- `--log`: If included (no value needed), logs will also be written to the default log file (`usage_translator.log`).
 
 ```bash
 python usage_translator.py --csv path/to/report.csv --json path/to/typemap.json --batch-insert-size 100 --log
