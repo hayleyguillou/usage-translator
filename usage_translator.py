@@ -2,7 +2,7 @@ import pandas as pd
 import json
 import argparse
 import logging
-from constants import OUTPUT_FOLDER, CHARGEABLE_SQL_FILE, DOMAINS_SQL_FILE, DEFAULT_CSV_FILE, DEFAULT_JSON_FILE, DEFAULT_LOG_FILE
+from constants import OUTPUT_FOLDER, CHARGEABLE_SQL_FILE, DOMAINS_SQL_FILE, DEFAULT_CSV_FILE, DEFAULT_JSON_FILE, DEFAULT_LOG_FILE, REQUIRED_COLUMNS
 from utils import setup_logging
 from processor import generate_chargeable_sql, generate_domains_sql
 
@@ -17,13 +17,26 @@ def main():
     args = parser.parse_args()
     setup_logging(args.log)
 
+    # Load CSV file into a DataFrame
     try:
         df = pd.read_csv(args.csv)
         logging.info(f"Loaded CSV: {args.csv}")
     except FileNotFoundError:
         logging.error(f"CSV file not found: {args.csv}")
         return
+    
+    # Check if the CSV is empty
+    if df.empty:
+        logging.error(f"CSV file is empty: {args.csv}")
+        return
 
+    # Check if required columns are present
+    missing_columns = [col for col in REQUIRED_COLUMNS if col not in df.columns]
+    if missing_columns:
+        logging.error(f"CSV file is missing required columns: {', '.join(missing_columns)}")
+        return
+
+    # Load JSON file for typemap
     try:
         with open(args.json) as f:
             type_map = json.load(f)

@@ -175,3 +175,6 @@ cython_debug/
 
 .DS_Store
 .vscode/
+
+# Exclude usage_translator.log from being ignored
+!usage_translator.log

@@ -1,12 +1,21 @@
 import pandas as pd
 from collections import defaultdict
 import logging
-from constants import PARTNER_IDS_TO_SKIP, UNIT_REDUCTION, NO_VALID_ROWS_CHARGEABLE_SQL, NO_VALID_ROWS_DOMAINS_SQL
+from constants import (
+    ACCOUNT_GUID,
+    DOMAINS,
+    ITEM_COUNT,
+    PART_NUMBER,
+    PARTNER_ID,
+    PLAN,
+    PARTNER_IDS_TO_SKIP,
+    UNIT_REDUCTION,
+    CHARGEABLE_INSERT_HEADER,
+    DOMAINS_INSERT_HEADER,
+    NO_VALID_ROWS_CHARGEABLE_SQL,
+    NO_VALID_ROWS_DOMAINS_SQL,
+)
 from utils import clean_guid, escape_sql_string
-
-# Constants for SQL generation
-CHARGEABLE_INSERT_HEADER = "INSERT INTO chargeable (partnerID, product, productPurchasedPlanID, plan, usage) VALUES \n"
-DOMAINS_INSERT_HEADER = "INSERT INTO domains (domain, partnerPurchasedPlanID) VALUES \n"
 
 def generate_chargeable_sql(df, type_map, output_file, partner_id_skip_list=PARTNER_IDS_TO_SKIP, batch_insert_size=0):
     """
@@ -19,6 +28,14 @@ def generate_chargeable_sql(df, type_map, output_file, partner_id_skip_list=PART
         partner_id_skip_list (list): List of PartnerIDs to skip.
         batch_insert_size (int): The number of rows to include in each batch insert statement.
             default: 0 (no batching).
+
+    Returns:
+        product_totals (dict): Dictionary mapping part numbers to total item counts (with unit reduction).
+        domain_partners (dict): Dictionary mapping domains to partnerPurchasedPlanID.
+
+    Assumptions:
+    - Any varchar field will fit in its column (i.e. no need to check length of plan).
+    - The totals of usage per part number are calculated using the unit reduction factor.
     """
     product_totals = defaultdict(int)
     domain_partners = defaultdict(str)
@@ -28,14 +45,14 @@ def generate_chargeable_sql(df, type_map, output_file, partner_id_skip_list=PART
     insert_started = False
 
     for index, row in df.iterrows():
-        row_number = index + 2  # Adjust for header row and 0-based index
+        csv_row_number = index + 2  # Adjust for header row and 0-based index
         
-        part_number = row["PartNumber"]
-        item_count = row["itemCount"]
-        partner_id = row["PartnerID"]
-        account_guid = row["accountGuid"]
-        domain = row["domains"]
-        plan = row["plan"]
+        part_number = row[PART_NUMBER]
+        item_count = row[ITEM_COUNT]
+        partner_id = row[PARTNER_ID]
+        account_guid = row[ACCOUNT_GUID]
+        domain = row[DOMAINS]
+        plan = row[PLAN]
         partner_purchased_plan_id = clean_guid(account_guid)
 
         try:
@@ -54,7 +71,7 @@ def generate_chargeable_sql(df, type_map, output_file, partner_id_skip_list=PART
             elif len(partner_purchased_plan_id) == 0 or len(partner_purchased_plan_id) > 32:
                 raise ValueError(f"Invalid partnerPurchasedPlanID ('{partner_purchased_plan_id}')")
         except ValueError as e:
-            logging.warning(f"{e}: skipping row {row_number}")
+            logging.warning(f"{e}: skipping row {csv_row_number}")
             continue
 
         translated_part_number = type_map[part_number]
@@ -76,7 +93,7 @@ def generate_chargeable_sql(df, type_map, output_file, partner_id_skip_list=PART
         )
         rows_to_insert += 1
         batch_count += 1
-        logging.debug(f"Processed row {row_number}: {partner_id}, {translated_part_number}, {partner_purchased_plan_id}, {plan}, {item_count}")
+        logging.debug(f"Processed row {csv_row_number}: {partner_id}, {translated_part_number}, {partner_purchased_plan_id}, {plan}, {item_count}")
         
         if batch_insert_size > 0 and batch_count >= batch_insert_size:
             logging.debug(f"Batch insert size reached: {batch_insert_size}; {rows_to_insert} rows inserted")

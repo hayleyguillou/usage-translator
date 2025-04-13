@@ -1,0 +1,47 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.11.11, pytest-8.3.5, pluggy-1.5.0 -- /Users/hayleyguillou/code/usage-translator/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /Users/hayleyguillou/code/usage-translator
+collecting ... collected 19 items
+
+test/test_generate_chargeable_sql.py::test_missing_part_number PASSED    [  5%]
+test/test_generate_chargeable_sql.py::test_zero_negative_item_count PASSED [ 10%]
+test/test_generate_chargeable_sql.py::test_non_numeric_item_count PASSED [ 15%]
+test/test_generate_chargeable_sql.py::test_invalid_partner_id PASSED     [ 21%]
+test/test_generate_chargeable_sql.py::test_partner_id_in_list PASSED     [ 26%]
+test/test_generate_chargeable_sql.py::test_part_number_not_in_typemap PASSED [ 31%]
+test/test_generate_chargeable_sql.py::test_invalid_partner_purchased_plan_id PASSED [ 36%]
+test/test_generate_chargeable_sql.py::test_unit_reduction PASSED         [ 42%]
+test/test_generate_chargeable_sql.py::test_product_totals PASSED         [ 47%]
+test/test_generate_chargeable_sql.py::test_domain_partners PASSED        [ 52%]
+test/test_generate_chargeable_sql.py::test_duplicate_domains_product_pairs PASSED [ 57%]
+test/test_generate_chargeable_sql.py::test_valid_data PASSED             [ 63%]
+test/test_generate_chargeable_sql.py::test_batch_insert_size PASSED      [ 68%]
+test/test_generate_chargeable_sql.py::test_sql_injection_with_single_quote PASSED [ 73%]
+test/test_generate_domains_sql.py::test_generate_domains_sql PASSED      [ 78%]
+test/test_generate_domains_sql.py::test_empty_domain_map PASSED          [ 84%]
+test/test_generate_domains_sql.py::test_batch_insert_size PASSED         [ 89%]
+test/test_utils.py::test_clean_guid PASSED                               [ 94%]
+test/test_utils.py::test_escape_sql_string PASSED                        [100%]
+
+=========================== short test summary info ============================
+PASSED test/test_generate_chargeable_sql.py::test_missing_part_number
+PASSED test/test_generate_chargeable_sql.py::test_zero_negative_item_count
+PASSED test/test_generate_chargeable_sql.py::test_non_numeric_item_count
+PASSED test/test_generate_chargeable_sql.py::test_invalid_partner_id
+PASSED test/test_generate_chargeable_sql.py::test_partner_id_in_list
+PASSED test/test_generate_chargeable_sql.py::test_part_number_not_in_typemap
+PASSED test/test_generate_chargeable_sql.py::test_invalid_partner_purchased_plan_id
+PASSED test/test_generate_chargeable_sql.py::test_unit_reduction
+PASSED test/test_generate_chargeable_sql.py::test_product_totals
+PASSED test/test_generate_chargeable_sql.py::test_domain_partners
+PASSED test/test_generate_chargeable_sql.py::test_duplicate_domains_product_pairs
+PASSED test/test_generate_chargeable_sql.py::test_valid_data
+PASSED test/test_generate_chargeable_sql.py::test_batch_insert_size
+PASSED test/test_generate_chargeable_sql.py::test_sql_injection_with_single_quote
+PASSED test/test_generate_domains_sql.py::test_generate_domains_sql
+PASSED test/test_generate_domains_sql.py::test_empty_domain_map
+PASSED test/test_generate_domains_sql.py::test_batch_insert_size
+PASSED test/test_utils.py::test_clean_guid
+PASSED test/test_utils.py::test_escape_sql_string
+============================== 19 passed in 0.31s ==============================
